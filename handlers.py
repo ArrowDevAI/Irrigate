@@ -6,17 +6,23 @@ VALVE_PIN = 2
 valve = Pin(VALVE_PIN, Pin.OUT)
 timer = Timer(-1)
 
+# Track timer state
+timer_active = False
+timer_end_time = 0
+
 def route_handler(path):
+    global timer_active, timer_end_time
+
     print("\n--- Route Handler Debug ---")
     print("Received path:", repr(path))
     print("Valve status:", valve.value())
-    
+
     if path == "/":
         return "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + """
         <html>
             <head>
                 <style>
-                body {
+                    body {
                         font-size: 2em;
                     }
                     .button {
@@ -28,7 +34,7 @@ def route_handler(path):
                         color: white;
                         border: none;
                         border-radius: 4px;
-                        font-size: 2em
+                        font-size: 2em;
                     }
                     .button:hover {
                         background-color: #45a049;
@@ -53,15 +59,13 @@ def route_handler(path):
                     <button class="button" onclick="openWithDuration()">Start</button>
                 </div>
 
-                
+                <p>Time remaining: <span id="countdown">0</span> seconds</p>
                 <p id="status"></p>
 
                 <script>
                     function controlValve(action) {
                         document.getElementById('status').textContent = 'Processing...';
-                        fetch('/' + action, {
-                            method: 'GET',
-                        })
+                        fetch('/' + action)
                         .then(response => response.text())
                         .then(text => {
                             document.getElementById('status').textContent = text;
@@ -70,25 +74,76 @@ def route_handler(path):
                             document.getElementById('status').textContent = 'Error: ' + error;
                         });
                     }
-                    
+
+                    function openWithDuration() {
+                        const duration = document.getElementById('duration').value;
+                        controlValve(`start?duration=${duration}`);
+                    }
+
+                    function updateCountdown() {
+                        fetch('/status')
+                            .then(response => response.text())
+                            .then(seconds => {
+                                const s = parseInt(seconds);
+                                const m = Math.floor(s / 60);
+                                const sec = s % 60;
+                                document.getElementById('countdown').textContent = `${m}m ${sec}s`;
+                            });
+                    }
+
+                    setInterval(updateCountdown, 1000);
+                </script>
             </body>
         </html>
         """
-        else:
-                return "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nInvalid duration"
+
+    elif path.startswith("/start?duration="):
+        try:
+            minutes = int(path.split('=')[1])
+            if minutes < 1 or minutes > 60:
+                return "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nDuration must be between 1 and 60 minutes"
+
+            seconds = minutes * 60
+            valve.on()
+            timer_active = True
+            timer_end_time = time.time() + seconds
+
+            def close_valve(t):
+                global timer_active
+                valve.off()
+                timer_active = False
+                print("Timer expired. Valve closed.")
+
+            timer.init(period=seconds * 1000, mode=Timer.ONE_SHOT, callback=close_valve)
+
+            return f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nValve opened for {minutes} minute(s)"
+
         except ValueError:
             return "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nInvalid duration format"
-            
+
+    elif path == "/status":
+        if timer_active:
+            remaining = max(0, int(timer_end_time - time.time()))
+            if remaining == 0:
+                timer_active = False
+        else:
+            remaining = 0
+        return f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n{remaining}"
+
     elif path == "/open":
         valve.on()
+        timer.deinit()
+        timer_active = False
+        timer_end_time = 0
         return "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nValve opened"
+
     elif path == "/close":
         valve.off()
-        # Cancel any running timer
         timer.deinit()
+        timer_active = False
+        timer_end_time = 0
         return "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nValve closed"
+
     else:
         print(f"No match found - path: '{path}'")
         return "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\nInvalid endpoint"
-
-

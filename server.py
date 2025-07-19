@@ -1,5 +1,6 @@
 import socket
 from handlers import route_handler
+import _thread
 
 def start_server(ip, route_handler):
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
