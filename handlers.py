@@ -104,13 +104,13 @@ def route_handler(path):
                 return "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nDuration must be between 1 and 60 minutes"
 
             seconds = minutes * 60
-            valve.on()
+            valve.off()
             timer_active = True
             timer_end_time = time.time() + seconds
 
             def close_valve(t):
                 global timer_active
-                valve.off()
+                valve.on()
                 timer_active = False
                 print("Timer expired. Valve closed.")
 
@@ -131,14 +131,14 @@ def route_handler(path):
         return f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n{remaining}"
 
     elif path == "/open":
-        valve.on()
+        valve.off()
         timer.deinit()
         timer_active = False
         timer_end_time = 0
         return "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nValve opened"
 
     elif path == "/close":
-        valve.off()
+        valve.on()
         timer.deinit()
         timer_active = False
         timer_end_time = 0
