@@ -147,3 +147,4 @@ def route_handler(path):
     else:
         print(f"No match found - path: '{path}'")
         return "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\nInvalid endpoint"
+
