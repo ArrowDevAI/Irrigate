@@ -16,18 +16,14 @@ def start_server(ip, route_handler):
         print("✅ Listening for connections...")
 
         while True:
-            print("⏳ Waiting for client...")
             try:
                 client_socket, client_addr = server_socket.accept()
-                print("🌐 Client connected from", client_addr)
 
                 request = client_socket.recv(1024)
-                print("📩 Raw request:", request)
 
                 try:
                     line = request.decode().split("\r\n")[0]
                     method, path, _ = line.split(" ")
-                    print(f"➡️  Method: {method}, Path: {path}")
                     response = route_handler(path)
                 except Exception as parse_error:
                     print("❌ Request parse error:", parse_error)
@@ -35,7 +31,6 @@ def start_server(ip, route_handler):
 
                 client_socket.send(response.encode())
                 client_socket.close()
-                print("✅ Response sent\n")
 
             except Exception as conn_error:
                 print("❌ Connection error:", conn_error)
@@ -49,4 +44,6 @@ def start_server(ip, route_handler):
             server_socket.close()
         except:
             print("⚠️ Could not close server socket")
+
+
 
